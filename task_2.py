@@ -145,7 +145,7 @@ param_values = saltelli.sample(problem, 2000)
 
 Y = evaluate(param_values, 2030)
 
-output_graphs = True
+output_graphs = False
 
 if output_graphs:
     for param_index, name in enumerate(problem['names']):

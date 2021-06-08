@@ -358,8 +358,8 @@ def unique(list):
 
 
 if __name__ == '__main__':
-    max_customers = 100
-    arrival_rate_bounds = [0, 2]
+    max_customers = 10000
+    arrival_rate_bounds = [0, 7]
 
     service_xk = np.arange(6) + 3
     service_pk = (0.1, 0.2, 0.3, 0.25, 0.1, 0.05)

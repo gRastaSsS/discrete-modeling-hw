@@ -109,4 +109,33 @@ for sex in ['Male', 'Female']:
 j += 1
 plt.autoscale()
 plt.savefig(f'./task-1/pl-{j}.png')
+
+flg = plt.figure()
+fig.set_tight_layout(True)
+
+for i, sex in enumerate(['Male', 'Female']):
+    if sex == 'Male':
+        est_pred = range_prediction_m
+        un_pred = range_r_pred_m
+    else:
+        est_pred = range_prediction_f
+        un_pred = range_r_pred_f
+
+    reduced_est = np.zeros(len(pred_years))
+    for per_age_group in est_pred.values():
+        for year in range(len(per_age_group)):
+            reduced_est[year] += per_age_group[year]
+
+    reduced_un = np.zeros(len(pred_years))
+    for per_age_group in un_pred.values():
+        for year in range(len(per_age_group)):
+            reduced_un[year] += per_age_group[year]
+
+    ax = plt.subplot(2, 1, i + 1)
+    ax.set_title(f'{sex}: All')
+    plt.plot(pred_years, reduced_est, color='r')
+    plt.plot(pred_years, reduced_un, color='g')
+
+plt.autoscale()
+plt.savefig('./task-1/pl-all.png')
 plt.close()
