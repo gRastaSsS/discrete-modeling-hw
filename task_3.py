@@ -130,6 +130,8 @@ class QueueModel:
         additional = self.statistics.copy()
         del additional['customers']
 
+        avg_time_in_system = sum([c.time_served - c.time_added_to_queue for c in customers]) / len(
+            customers)
         avg_waiting_in_queue = sum([c.time_spent_in_queue for c in customers]) / len(customers)
         avg_server_time = sum([c.time_to_serve for c in customers]) / len(customers)
         customer_wait_prob = sum([1 for c in customers if c.time_spent_in_queue > 0]) / len(
@@ -143,7 +145,8 @@ class QueueModel:
             "customers": [c.__dict__ for c in customers],
             "waiting_in_queue": [c.time_spent_in_queue for c in customers],
             "average_waiting_in_queue": avg_waiting_in_queue,
-            "average_server_time": avg_server_time,
+            "average_serve_time": avg_server_time,
+            "average_time_in_system": avg_time_in_system,
             "probability_that_customer_has_to_wait": customer_wait_prob,
             "probability_that_server_is_idle": server_idle_prob
 
@@ -179,10 +182,12 @@ class ShortestQueueModel(QueueModel):
                     customer.on_add_to_server(self.global_time, server)
                     server.start(customer)
 
-        for server in self.servers:
-            server.update(self.global_time)
-
         self.global_time += 1
+
+        for i, server in enumerate(self.servers):
+            finished = server.update(self.global_time)
+            if finished:
+                self.queues[i].pop()
 
 
 class GeneralQueueModel(QueueModel):
@@ -210,21 +215,22 @@ class GeneralQueueModel(QueueModel):
                     server.start(customer)
                     break
 
+        self.global_time += 1
+
         for server in self.servers:
             server.update(self.global_time)
-
-        self.global_time += 1
 
 
 class DynamicShortestQueueModel(ShortestQueueModel):
     def __init__(self):
         super().__init__()
         self.server_id_generator = 4
+        self.max_servers = 10
 
     def add_customer(self, customer):
         queues = sorted(self.queues, key=lambda q: q.size())
 
-        if not queues[0].is_empty():
+        if not queues[0].is_empty() and len(queues) < self.max_servers:
             queue = Queue()
             self.servers.append(Server(self.server_id_generator))
             self.queues.append(queue)
@@ -244,9 +250,16 @@ class DynamicShortestQueueModel(ShortestQueueModel):
         for i, server in enumerate(self.servers):
             if server.free:
                 if not self.queues[i].is_empty():
-                    customer = self.queues[i].pop()
+                    customer = self.queues[i].peek()
                     customer.on_add_to_server(self.global_time, server)
                     server.start(customer)
+
+        self.global_time += 1
+
+        for i, server in enumerate(self.servers):
+            finished = server.update(self.global_time)
+            if finished:
+                self.queues[i].pop()
 
         free_s = [s.free and self.queues[i].is_empty() for i, s in enumerate(self.servers)]
         free_s = [i for i, x in enumerate(free_s) if x]
@@ -254,11 +267,6 @@ class DynamicShortestQueueModel(ShortestQueueModel):
         if len(free_s) >= 2:
             del self.servers[free_s[0]]
             del self.queues[free_s[0]]
-
-        for server in self.servers:
-            server.update(self.global_time)
-
-        self.global_time += 1
 
     def __on_update(self):
         if 'servers' not in self.statistics:
@@ -271,6 +279,7 @@ class DynamicGeneralQueueModel(GeneralQueueModel):
     def __init__(self):
         super().__init__()
         self.server_id_generator = 4
+        self.max_servers = 10
 
     def update(self):
         self.__on_update()
@@ -278,7 +287,7 @@ class DynamicGeneralQueueModel(GeneralQueueModel):
         if not self.customer_queue.is_empty():
             all_busy = all([not s.free for s in self.servers])
 
-            if all_busy:
+            if all_busy and len(self.servers) < self.max_servers:
                 self.servers.append(Server(self.server_id_generator))
                 self.server_id_generator += 1
 
@@ -295,10 +304,10 @@ class DynamicGeneralQueueModel(GeneralQueueModel):
         if len(free_s) >= 2:
             del self.servers[free_s[0]]
 
+        self.global_time += 1
+
         for server in self.servers:
             server.update(self.global_time)
-
-        self.global_time += 1
 
     def __on_update(self):
         if 'servers' not in self.statistics:
